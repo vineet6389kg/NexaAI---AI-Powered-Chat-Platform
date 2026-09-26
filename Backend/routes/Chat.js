@@ -58,4 +58,13 @@ router.delete("/thread/:threadId", async (req, res) => {
   }
 });
 
+router.post("/chat", async(req,res)=>{
+  try{
+
+  }catch(err){
+    console.log(err);
+
+  }
+})
+
 export default router;
