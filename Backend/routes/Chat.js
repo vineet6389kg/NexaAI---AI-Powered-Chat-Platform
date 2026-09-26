@@ -32,7 +32,7 @@ router.get("/thread", async (req, res) => {
   }
 });
 
-router.get("thread/:threadId", async (req, res) => {
+router.get("/thread/:threadId", async (req, res) => {
   const { threadId } = req.params;
   try {
     const thread = await Thread.findOne({ threadId });
@@ -51,7 +51,7 @@ router.delete("/thread/:threadId", async (req, res) => {
   try {
     const deletedThread = await Thread.findOneAndDelete({ threadId });
     if (!deletedThread) {
-      res.status(404)({ error: "Thread Not Found" });
+      res.status(404).json({ error: "Thread Not Found" });
     }
     res.status(200).json({ success: "Thread Deleted Successfully" });
   } catch (err) {
@@ -64,11 +64,11 @@ router.post("/chat", async(req,res)=>{
   const {threadId, message} = req.body;
   
   if(!threadId || !message){
-    res.status(404).json({error: "missing required field"});
+   return res.status(404).json({error: "missing required field"});
   }
 
   try{
-    const thread = await Thread.findOne({threadId});
+     let thread = await Thread.findOne({threadId});
 
     if(!thread){
       // create a new thread in DB
@@ -81,7 +81,7 @@ router.post("/chat", async(req,res)=>{
       thread.messages.push({role: "user", content: message});
     }
 
-    const assistantReply = getGeminiResponse(message);
+    const assistantReply = await getGeminiResponse(message);
 
     thread.messages.push({role:"assistant", content: assistantReply});
     thread.updatedAt = new Date();
