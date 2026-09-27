@@ -1,7 +1,11 @@
 import "./ChatWindow.css";
 import Chat from "./Chat";
+import { MyContext } from "./MyContext";
+import { useContext, useState } from "react";
 
 function ChatWindow() {
+  const { prompt, setPrompt, reply, setReply,currThreadId } = useContext(MyContext);
+
   return (
     <div className="chatWindow">
       <div className="navbar">
@@ -18,8 +22,12 @@ function ChatWindow() {
 
       <div className="chatInput">
         <div className="inputBox">
-          <input placeholder="Ask anything"></input>
-          <div id="submit">
+          <input
+            placeholder="Ask anything"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+          ></input>
+          <div id="submit" onClick={getReply}>
             <i className="fa-solid fa-paper-plane"></i>
           </div>
         </div>
