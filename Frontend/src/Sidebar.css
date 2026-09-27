@@ -16,7 +16,7 @@ button {
     padding: 10px;
     border-radius: 5px;
     background-color: transparent;
-    border: solid rgba(255,255,255,0.5);
+    border: solid 0.5px rgba(255,255,255,0.5);
     cursor: pointer;
 }
 
@@ -56,4 +56,12 @@ button:hover {
 .history li:hover {
     background-color: rgba(180,180,180, 0.05);
     border-radius: 10px;
+}
+
+.sign {
+    padding: 10px;
+    margin: 10px;
+    font-size: 14px;
+    text-align: center;
+    border-top: solid rgba(255,255,255,0.5);
 }

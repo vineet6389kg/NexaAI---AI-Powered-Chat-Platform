@@ -1,5 +1,5 @@
 import "./Chat.css";
-z
+
 function Chat() {
     return(
         <>
