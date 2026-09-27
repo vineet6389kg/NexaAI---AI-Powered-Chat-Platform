@@ -6,6 +6,29 @@ import { useContext, useState } from "react";
 function ChatWindow() {
   const { prompt, setPrompt, reply, setReply,currThreadId } = useContext(MyContext);
 
+  const getReply = async () => {
+    console.log("message", prompt, "threadId", currThreadId);
+    const options = {
+        method: "post",
+        headers: {
+            "Content-type": "application/json"
+        },
+        body: JSON.stringify( {
+            message: prompt,
+            threadId: currThreadId 
+        })
+    };
+
+    try{
+       const response =  await fetch("http://localhost:8080/api/chat", options);
+       const res = await response.json();
+       console.log(res);   
+
+    }catch(err){
+        console.log(err);
+    }
+  }
+
   return (
     <div className="chatWindow">
       <div className="navbar">
