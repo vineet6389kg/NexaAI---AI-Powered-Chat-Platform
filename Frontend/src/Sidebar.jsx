@@ -7,7 +7,7 @@ function Sidebar(){
             
             <button>
                <img src={geminiLogo} alt="Gemini Logo" width="50" height="50" className="logo" />
-                <i className="fa-solid fa-pen-to-square"></i>
+               <span> <i className="fa-solid fa-pen-to-square"></i> </span> 
             </button>
 
 
