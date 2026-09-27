@@ -13,10 +13,10 @@ function Sidebar(){
 
           
 
-            <ul>
-                <li>History1</li>
-                <li>History1</li>
-                <li>History1</li>
+            <ul className="history">
+                <li>thread1</li>
+                <li>thread2</li>
+                <li>thread3</li>
             </ul>
 
 
