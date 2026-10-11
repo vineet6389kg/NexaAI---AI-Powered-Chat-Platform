@@ -2,41 +2,64 @@ import "./ChatWindow.css";
 import Chat from "./Chat";
 import { MyContext } from "./MyContext";
 import { useContext, useState, useEffect } from "react";
-import {HashLoader, ScaleLoader, SyncLoader} from "react-spinners";
+import { HashLoader } from "react-spinners";
 
 function ChatWindow() {
-  const { prompt, setPrompt, reply, setReply,currThreadId } = useContext(MyContext);
+  const {
+    prompt,
+    setPrompt,
+    reply,
+    setReply,
+    currThreadId,
+    prevChats,
+    setPrevChats,
+  } = useContext(MyContext);
   const [loading, setLoading] = useState(false);
 
   const getReply = async () => {
     setLoading(true);
     console.log("message", prompt, "threadId", currThreadId);
     const options = {
-        method: "post",
-        headers: {
-            "Content-type": "application/json"
-        },
-        body: JSON.stringify( {
-            message: prompt,
-            threadId: currThreadId 
-        })
+      method: "post",
+      headers: {
+        "Content-type": "application/json",
+      },
+      body: JSON.stringify({
+        message: prompt,
+        threadId: currThreadId,
+      }),
     };
 
-    try{
-       const response =  await fetch("http://localhost:8080/api/chat", options);
-       const res = await response.json();
-       console.log(res);   
-       setReply(res.reply);
-
-    }catch(err){
-        console.log(err);
+    try {
+      const response = await fetch("http://localhost:8080/api/chat", options);
+      const res = await response.json();
+      console.log(res);
+      setReply(res.reply);
+    } catch (err) {
+      console.log(err);
     }
     setLoading(false);
-  }
+  };
 
   // Append Chat In New Chat
 
-  
+  useEffect(() => {
+    if (prompt && reply) {
+      setPrevChats((prevChats) => [
+        ...prevChats,
+        {
+          role: "user",
+          content: prompt,
+        },
+        {
+          role: "assistant",
+          content: reply,
+        },
+      ]);
+    }
+
+    setPrompt("");
+  }, [reply]);
 
   return (
     <div className="chatWindow">
@@ -52,9 +75,11 @@ function ChatWindow() {
       </div>
       <Chat></Chat>
 
-      <HashLoader color="#fff" loading={loading} speedMultiplier={1.5}>
-
-      </HashLoader>
+      <HashLoader
+        color="#fff"
+        loading={loading}
+        speedMultiplier={1.5}
+      ></HashLoader>
 
       <div className="chatInput">
         <div className="inputBox">
@@ -62,7 +87,7 @@ function ChatWindow() {
             placeholder="Ask anything"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter'? getReply() : ''}
+            onKeyDown={(e) => (e.key === "Enter" ? getReply() : "")}
           ></input>
           <div id="submit" onClick={getReply}>
             <i className="fa-solid fa-paper-plane"></i>
