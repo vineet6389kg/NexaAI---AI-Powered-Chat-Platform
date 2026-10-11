@@ -6,8 +6,10 @@ import {HashLoader, ScaleLoader, SyncLoader} from "react-spinners";
 
 function ChatWindow() {
   const { prompt, setPrompt, reply, setReply,currThreadId } = useContext(MyContext);
+  const [loading, setLoading] = useState(false);
 
   const getReply = async () => {
+    setLoading(true);
     console.log("message", prompt, "threadId", currThreadId);
     const options = {
         method: "post",
@@ -29,6 +31,7 @@ function ChatWindow() {
     }catch(err){
         console.log(err);
     }
+    setLoading(false);
   }
 
   return (
@@ -45,7 +48,7 @@ function ChatWindow() {
       </div>
       <Chat></Chat>
 
-      <HashLoader color="#fff">
+      <HashLoader color="#fff" loading={loading}>
 
       </HashLoader>
 
