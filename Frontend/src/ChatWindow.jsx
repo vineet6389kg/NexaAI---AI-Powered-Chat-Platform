@@ -48,7 +48,7 @@ function ChatWindow() {
       </div>
       <Chat></Chat>
 
-      <HashLoader color="#fff" loading={loading}>
+      <HashLoader color="#fff" loading={loading} speedMultiplier={1.5}>
 
       </HashLoader>
 
