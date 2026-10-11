@@ -59,41 +59,44 @@ router.delete("/thread/:threadId", async (req, res) => {
   }
 });
 
-router.post("/chat", async(req,res)=>{
+router.post("/chat", async (req, res) => {
+  const { threadId, message } = req.body;
 
-  const {threadId, message} = req.body;
-  
-  if(!threadId || !message){
-   return res.status(404).json({error: "missing required field"});
+  if (!threadId || !message) {
+    return res.status(404).json({ error: "missing required field" });
   }
 
-  try{
-     let thread = await Thread.findOne({threadId});
+  try {
+    let thread = await Thread.findOne({ threadId });
 
-    if(!thread){
+    if (!thread) {
       // create a new thread in DB
-       thread = new Thread({
+      thread = new Thread({
         threadId,
         title: message,
-        messages: [{role: "user", content: message}]
-       });
-    }else {
-      thread.messages.push({role: "user", content: message});
+        messages: [{ role: "user", content: message }],
+      });
+    } else {
+      thread.messages.push({ role: "user", content: message });
     }
 
     const assistantReply = await getGeminiResponse(message);
 
-    thread.messages.push({role:"assistant", content: assistantReply});
+    if (!assistantReply) {
+      return res.status(500).json({
+        error: "Gemini failed to generate a response",
+      });
+    }
+
+    thread.messages.push({ role: "assistant", content: assistantReply });
     thread.updatedAt = new Date();
 
     await thread.save();
-    res.json({reply: assistantReply});
-
-  }catch(err){
+    res.json({ reply: assistantReply });
+  } catch (err) {
     console.log(err);
-    res.status(500).json({error: "Something is wrong"});  
-
+    res.status(500).json({ error: "Something is wrong" });
   }
-})
+});
 
 export default router;

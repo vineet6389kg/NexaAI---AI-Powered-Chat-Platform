@@ -2,6 +2,7 @@ import "./ChatWindow.css";
 import Chat from "./Chat";
 import { MyContext } from "./MyContext";
 import { useContext, useState } from "react";
+import {ScaleLoader} from "react-spinners";
 
 function ChatWindow() {
   const { prompt, setPrompt, reply, setReply,currThreadId } = useContext(MyContext);
@@ -23,6 +24,7 @@ function ChatWindow() {
        const response =  await fetch("http://localhost:8080/api/chat", options);
        const res = await response.json();
        console.log(res);   
+       setReply(res.reply);
 
     }catch(err){
         console.log(err);
@@ -43,12 +45,17 @@ function ChatWindow() {
       </div>
       <Chat></Chat>
 
+      <ScaleLoader>
+        
+      </ScaleLoader>
+
       <div className="chatInput">
         <div className="inputBox">
           <input
             placeholder="Ask anything"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter'? getReply() : ''}
           ></input>
           <div id="submit" onClick={getReply}>
             <i className="fa-solid fa-paper-plane"></i>
