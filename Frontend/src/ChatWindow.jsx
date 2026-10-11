@@ -1,7 +1,7 @@
 import "./ChatWindow.css";
 import Chat from "./Chat";
 import { MyContext } from "./MyContext";
-import { useContext, useState } from "react";
+import { useContext, useState, useEffect } from "react";
 import {HashLoader, ScaleLoader, SyncLoader} from "react-spinners";
 
 function ChatWindow() {
@@ -33,6 +33,10 @@ function ChatWindow() {
     }
     setLoading(false);
   }
+
+  // Append Chat In New Chat
+
+  
 
   return (
     <div className="chatWindow">
