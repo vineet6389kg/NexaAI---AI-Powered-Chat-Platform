@@ -13,9 +13,10 @@ function ChatWindow() {
     currThreadId,
     prevChats,
     setPrevChats,
-    setNewChat
+    setNewChat,
   } = useContext(MyContext);
   const [loading, setLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(true); // set default false value
 
   const getReply = async () => {
     setLoading(true);
@@ -75,6 +76,13 @@ function ChatWindow() {
           </span>
         </div>
       </div>
+      {isOpen && (
+        <div className="dropDown">
+          <div className="dropDownItem">Upgrade-plan</div>
+          <div className="dropDownItem">Setting</div>
+          <div className="dropDownItem">Log out</div>
+        </div>
+      )}
       <Chat></Chat>
 
       <HashLoader
