@@ -6,13 +6,18 @@ import rehypeHighlight from "rehype-highlight"
 import "highlight.js/styles/github-dark.css"
 
 function Chat() {
-  const { newChat, prevChats } = useContext(MyContext);
+  const { newChat, prevChats, reply } = useContext(MyContext);
   const [latestReply, setLatestReply] = useState(null);
 
   useEffect(() => {
     if(!prevChats?.length) return;
 
     const content = reply.split(" "); // individual worlds
+
+    const idx = 0;
+    const interval = setInterval(() => {
+
+    },40);
     
 
   }, [prevChats, reply]);
