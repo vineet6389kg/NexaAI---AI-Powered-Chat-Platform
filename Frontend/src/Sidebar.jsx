@@ -74,7 +74,9 @@ function Sidebar() {
         allThreads?.map((thread, idx) => (
             <li key={idx}
               onClick={ (e) => changeThread(thread.threadId)}
-            >{thread.title}</li>
+            >{thread.title}
+            <i class="fa-solid fa-trash"></i>
+            </li>
         ))
       }
       </ul>
