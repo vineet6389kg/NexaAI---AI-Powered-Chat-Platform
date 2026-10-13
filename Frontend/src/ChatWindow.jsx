@@ -64,13 +64,18 @@ function ChatWindow() {
     setPrompt("");
   }, [reply]);
 
+
+  const handleProfileClick = () => {
+    setIsOpen(!isOpen);
+  }
+
   return (
     <div className="chatWindow">
       <div className="navbar">
         <span>
           NexaAI<i className="fa-solid fa-chevron-down"></i>
         </span>
-        <div className="userIconDiv">
+        <div className="userIconDiv" onClick={handleProfileClick}>
           <span className="userIcon">
             <i className="fa-solid fa-user"></i>{" "}
           </span>
