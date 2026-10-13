@@ -32,3 +32,28 @@
     
 
 }
+
+
+/* Custom dark scrollbar */
+.chats {
+  scrollbar-width: thin;
+  scrollbar-color: #555 transparent;
+}
+
+.chats::-webkit-scrollbar {
+  width: 7px;
+}
+
+.chats::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chats::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 10px;
+}
+
+.chats::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
+ 
