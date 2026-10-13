@@ -16,7 +16,7 @@ function ChatWindow() {
     setNewChat,
   } = useContext(MyContext);
   const [loading, setLoading] = useState(false);
-  const [isOpen, setIsOpen] = useState(true); // set default false value
+  const [isOpen, setIsOpen] = useState(false); // set default false value
 
   const getReply = async () => {
     setLoading(true);
@@ -78,9 +78,16 @@ function ChatWindow() {
       </div>
       {isOpen && (
         <div className="dropDown">
-          <div className="dropDownItem">Upgrade-plan</div>
-          <div className="dropDownItem">Setting</div>
-          <div className="dropDownItem">Log out</div>
+          <div className="dropDownItem">
+            <i className="fa-solid fa-gear"></i>Setting
+          </div>
+          <div className="dropDownItem">
+            <i className="fa-solid fa-cloud-arrow-up"></i>Upgrade-plan
+          </div>
+
+          <div className="dropDownItem">
+            <i className="fa-solid fa-right-from-bracket"></i>Log out
+          </div>
         </div>
       )}
       <Chat></Chat>
