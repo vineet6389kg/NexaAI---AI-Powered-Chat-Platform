@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import User from "../models/User.js";
 import requireAuth from "../middleware/auth.js";
+import publicUser from "../utils/publicUser.js";
 
 const router = express.Router();
 
@@ -33,7 +34,6 @@ const makeToken = (user) =>
   jwt.sign({ id: user._id, guest: user.isGuest }, process.env.JWT_SECRET, {
     expiresIn: user.isGuest ? "1d" : "7d",
   });
-const publicUser = (u) => ({ id: u._id, name: u.name, email: u.email, isGuest: u.isGuest });
 
 router.post("/signup", authLimiter, async (req, res) => {
   try {
