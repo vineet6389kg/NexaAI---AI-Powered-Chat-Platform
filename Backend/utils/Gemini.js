@@ -1,62 +1,33 @@
 import "dotenv/config";
 
-const BASE = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash";
+const URL_STREAM =
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:streamGenerateContent?alt=sse";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// messages = [{ role, content, image?: { mimeType, data } }]
 const toContents = (messages) =>
-    messages.map((m) => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
-    }));
-
-const headers = () => ({
-    "Content-Type": "application/json",
-    "x-goog-api-key": process.env.GEMINI_API_KEY,
-});
-
-// Normal (non-streaming) reply, with retry when Google is busy
-const getGeminiResponse = async (messages) => {
-    const body = JSON.stringify({ contents: toContents(messages) });
-    const MAX_TRIES = 3;
-
-    for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
-        const response = await fetch(`${BASE}:generateContent`, {
-            method: "POST",
-            headers: headers(),
-            body,
-        });
-        const data = await response.json();
-
-        if (response.ok) {
-            const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!reply) throw new Error("Gemini returned an empty response");
-            return reply;
+    messages.map((m) => {
+        const parts = [];
+        if (m.image?.data) {
+            parts.push({ inlineData: { mimeType: m.image.mimeType, data: m.image.data } });
         }
+        parts.push({ text: m.content });
+        return { role: m.role === "assistant" ? "model" : "user", parts };
+    });
 
-        console.log(`Gemini error (try ${attempt}/${MAX_TRIES}):`, data?.error?.message);
-
-        const busy = response.status === 503 || response.status === 429;
-        if (busy && attempt < MAX_TRIES) {
-            await sleep(attempt * 1500);
-            continue;
-        }
-
-        const err = new Error(data?.error?.message || "Gemini API request failed");
-        err.status = response.status;
-        throw err;
-    }
-};
-
-// Streaming reply: calls onChunk(text) for every piece, returns the full text
+// Streams the reply: calls onChunk(text) for every piece, returns the full text
 export const streamGeminiResponse = async (messages, onChunk, signal) => {
     const body = JSON.stringify({ contents: toContents(messages) });
     const MAX_TRIES = 3;
     let response;
 
     for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
-        response = await fetch(`${BASE}:streamGenerateContent?alt=sse`, {
+        response = await fetch(URL_STREAM, {
             method: "POST",
-            headers: headers(),
+            headers: {
+                "Content-Type": "application/json",
+                "x-goog-api-key": process.env.GEMINI_API_KEY,
+            },
             body,
             signal,
         });
@@ -64,8 +35,9 @@ export const streamGeminiResponse = async (messages, onChunk, signal) => {
         if (response.ok) break;
 
         const data = await response.json().catch(() => ({}));
-        console.log(`Gemini stream error (try ${attempt}/${MAX_TRIES}):`, data?.error?.message);
+        console.log(`Gemini error (try ${attempt}/${MAX_TRIES}):`, data?.error?.message);
 
+        // 503 = Google busy, 429 = too many requests -> wait and retry
         const busy = response.status === 503 || response.status === 429;
         if (busy && attempt < MAX_TRIES) {
             await sleep(attempt * 1500);
@@ -109,5 +81,3 @@ export const streamGeminiResponse = async (messages, onChunk, signal) => {
 
     return full;
 };
-
-export default getGeminiResponse;
