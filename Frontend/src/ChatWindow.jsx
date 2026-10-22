@@ -14,6 +14,7 @@ function ChatWindow({ onMenu }) {
   const [gotText, setGotText] = useState(false); // has the first piece arrived?
   const [error, setError] = useState("");
   const [image, setImage] = useState(null); // { mimeType, data }
+  const [dragging, setDragging] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const textareaRef = useRef(null);
@@ -114,6 +115,51 @@ function ChatWindow({ onMenu }) {
     setLoading(false);
   };
 
+  // drag & drop an image anywhere on the page.
+  // Without this, the browser opens the dropped file and leaves the app.
+  useEffect(() => {
+    let depth = 0; // counts enter/leave events so the overlay doesn't flicker
+    const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
+
+    const onEnter = (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth++;
+      setDragging(true);
+    };
+    const onOver = (e) => {
+      if (hasFiles(e)) e.preventDefault(); // required, or the browser opens the file
+    };
+    const onLeave = (e) => {
+      if (!hasFiles(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) setDragging(false);
+    };
+    const onDrop = (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth = 0;
+      setDragging(false);
+      const file = [...e.dataTransfer.files].find((f) => f.type.startsWith("image/"));
+      if (!file) {
+        setError("Please drop an image file (folders and other files are not supported).");
+        return;
+      }
+      attach(file);
+    };
+
+    window.addEventListener("dragenter", onEnter);
+    window.addEventListener("dragover", onOver);
+    window.addEventListener("dragleave", onLeave);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragenter", onEnter);
+      window.removeEventListener("dragover", onOver);
+      window.removeEventListener("dragleave", onLeave);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, []);
+
   // grow the textarea with its content (max ~8 lines)
   useEffect(() => {
     const el = textareaRef.current;
@@ -142,6 +188,16 @@ function ChatWindow({ onMenu }) {
 
   return (
     <main className="flex min-w-0 flex-1 flex-col">
+      {/* overlay shown while dragging a file over the page */}
+      {dragging && (
+        <div className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-bg/80 backdrop-blur-sm">
+          <div className="rounded-2xl border-2 border-dashed border-accent px-10 py-8 text-center">
+            <i className="fa-regular fa-image text-3xl text-accent" />
+            <p className="mt-3 font-medium">Drop an image to attach it</p>
+          </div>
+        </div>
+      )}
+
       {/* top bar */}
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-line px-3 sm:px-4">
         <div className="flex items-center gap-2">
