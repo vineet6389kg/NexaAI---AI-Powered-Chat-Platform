@@ -24,3 +24,40 @@ export async function apiFetch(path, options = {}) {
   }
   return data;
 }
+
+// Reads the streaming reply and calls onText(text) for each piece
+export async function streamChat({ message, threadId, signal, onText }) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}/chat/stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ message, threadId }),
+    signal,
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Something went wrong");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split("\n\n");
+    buffer = events.pop();
+    for (const ev of events) {
+      if (!ev.startsWith("data:")) continue;
+      const data = JSON.parse(ev.slice(5).trim());
+      if (data.error) throw new Error(data.error);
+      if (data.text) onText(data.text);
+    }
+  }
+}

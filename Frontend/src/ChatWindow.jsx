@@ -1,54 +1,77 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { MyContext } from "./MyContext.jsx";
 import { useAuth } from "./AuthContext.jsx";
-import { apiFetch } from "./api.js";
+import { streamChat } from "./api.js";
 import Chat from "./Chat.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 
 function ChatWindow({ onMenu }) {
-  const {
-    prompt, setPrompt,
-    reply, setReply,
-    currThreadId,
-    setPrevChats, setNewChat,
-  } = useContext(MyContext);
+  const { prompt, setPrompt, currThreadId, prevChats, setPrevChats, setNewChat } =
+    useContext(MyContext);
   const { user, logout } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [gotText, setGotText] = useState(false); // has the first piece arrived?
   const [error, setError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const textareaRef = useRef(null);
+  const abortRef = useRef(null);
 
   const getReply = async () => {
-    if (!prompt.trim() || loading) return;
+    const message = prompt.trim();
+    if (!message || loading) return;
+
+    const wasNew = prevChats.length === 0;
     setLoading(true);
+    setGotText(false);
     setError("");
     setNewChat(false);
+    setPrompt("");
+    // show the question and an empty answer right away
+    setPrevChats((prev) => [
+      ...prev,
+      { role: "user", content: message },
+      { role: "assistant", content: "" },
+    ]);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let received = false;
+
+    // nothing arrived: remove the empty exchange and give the text back
+    const undo = () => {
+      setPrevChats((prev) => prev.slice(0, -2));
+      setPrompt(message);
+      if (wasNew) setNewChat(true);
+    };
+
     try {
-      const res = await apiFetch("/chat", {
-        method: "POST",
-        body: JSON.stringify({ message: prompt, threadId: currThreadId }),
+      await streamChat({
+        message,
+        threadId: currThreadId,
+        signal: controller.signal,
+        onText: (text) => {
+          received = true;
+          setGotText(true);
+          setPrevChats((prev) => {
+            const copy = [...prev];
+            const last = copy[copy.length - 1];
+            copy[copy.length - 1] = { ...last, content: last.content + text };
+            return copy;
+          });
+        },
       });
-      setReply(res.reply);
     } catch (err) {
-      console.log(err);
-      setError(err.message || "Could not get a reply. Please try again.");
+      if (err.name !== "AbortError") {
+        console.log(err);
+        setError(err.message || "Could not get a reply. Please try again.");
+      }
+      if (!received) undo(); // with Stop, a partial answer is kept
     }
+
+    abortRef.current = null;
     setLoading(false);
   };
-
-  // append the new Q&A to the current thread (unchanged logic)
-  useEffect(() => {
-    if (prompt && reply) {
-      setPrevChats((prev) => [
-        ...prev,
-        { role: "user", content: prompt },
-        { role: "assistant", content: reply },
-      ]);
-    }
-    setPrompt("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reply]);
 
   // grow the textarea with its content (max ~8 lines)
   useEffect(() => {
@@ -74,7 +97,7 @@ function ChatWindow({ onMenu }) {
   }, [menuOpen]);
 
   const initial = (user?.name || user?.email || "?").charAt(0).toUpperCase();
-  const canSend = prompt.trim().length > 0 && !loading;
+  const canSend = prompt.trim().length > 0;
 
   return (
     <main className="flex min-w-0 flex-1 flex-col">
@@ -126,7 +149,7 @@ function ChatWindow({ onMenu }) {
       {/* input area */}
       <div className="shrink-0 px-4 pb-4 pt-2">
         <div className="mx-auto w-full max-w-3xl">
-          {loading && (
+          {loading && !gotText && (
             <div className="mb-2 flex items-center gap-1 px-1 text-muted" role="status" aria-label="NexaAI is thinking">
               <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
               <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
@@ -146,7 +169,6 @@ function ChatWindow({ onMenu }) {
               placeholder="Ask anything"
               aria-label="Message"
               value={prompt}
-              readOnly={loading}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -156,14 +178,25 @@ function ChatWindow({ onMenu }) {
               }}
               className="max-h-[200px] min-h-[36px] flex-1 resize-none bg-transparent px-1 py-1.5 text-[0.95rem] outline-none placeholder:text-muted focus-visible:outline-none"
             />
-            <button
-              onClick={getReply}
-              disabled={!canSend}
-              aria-label="Send message"
-              className="mb-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-fg transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <i className="fa-solid fa-arrow-up" />
-            </button>
+            {loading ? (
+              <button
+                onClick={() => abortRef.current?.abort()}
+                aria-label="Stop generating"
+                title="Stop generating"
+                className="mb-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-fg text-bg transition-opacity hover:opacity-80"
+              >
+                <i className="fa-solid fa-stop text-xs" />
+              </button>
+            ) : (
+              <button
+                onClick={getReply}
+                disabled={!canSend}
+                aria-label="Send message"
+                className="mb-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-fg transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <i className="fa-solid fa-arrow-up" />
+              </button>
+            )}
           </div>
           <p className="mt-2 text-center text-xs text-muted">
             NexaAI can make mistakes. Check important info.
