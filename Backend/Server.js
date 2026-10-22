@@ -5,6 +5,9 @@ import mongoose from 'mongoose';
 import dns from 'node:dns';
 import chatRouter from './routes/Chat.js';
 import authRouter from './routes/Auth.js';
+import paymentRouter from './routes/Payment.js';
+import requireAuth from './middleware/auth.js';
+import usageLimit from './middleware/usage.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -19,6 +22,10 @@ dns.setServers([
 ]);
 
 app.use("/api/auth", authRouter);
+app.use("/api/payment", paymentRouter);
+
+// free users: daily message limit (runs before the chat routes)
+app.use("/api/chat", requireAuth, usageLimit);
 app.use("/api", chatRouter);
 
 app.listen(PORT, () => {
