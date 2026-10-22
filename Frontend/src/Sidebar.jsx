@@ -4,11 +4,17 @@ import { MyContext } from "./MyContext.jsx";
 import { apiFetch } from "./api.js";
 import Logo from "./Logo.jsx";
 
+const AUTHOR = {
+  name: "Vineet Kumar",
+  github: "https://github.com/vineet6389kg",
+  linkedin: "https://www.linkedin.com/in/vineet-kumar-046373329",
+};
+
 function Sidebar({ open, onClose }) {
   const {
     allThreads, setAllThreads,
     currThreadId, setCurrThreadId,
-    setNewChat, setPrompt, setReply, setPrevChats,
+    newChat, setNewChat, setPrompt, setReply, setPrevChats,
   } = useContext(MyContext);
 
   const getAllThreads = async () => {
@@ -74,28 +80,33 @@ function Sidebar({ open, onClose }) {
         }`}
         aria-label="Chat history"
       >
-        <div className="flex items-center justify-between p-3">
-          <div className="flex items-center gap-2 px-1">
-            <Logo size={28} />
-            <span className="font-semibold">NexaAI</span>
-          </div>
+        {/* logo */}
+        <div className="flex items-center gap-2 px-4 pb-2 pt-4">
+          <Logo size={28} />
+          <span className="font-semibold">NexaAI</span>
+        </div>
+
+        {/* new chat button */}
+        <div className="px-3 pb-2 pt-1">
           <button
             onClick={createNewChat}
-            aria-label="New chat"
-            title="New chat"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-raised hover:text-fg"
+            className="flex w-full items-center gap-2.5 rounded-lg border border-line-strong px-3 py-2.5 text-sm font-medium transition-colors hover:bg-raised"
           >
-            <i className="fa-regular fa-pen-to-square" />
+            <i className="fa-regular fa-pen-to-square text-muted" />
+            New chat
           </button>
         </div>
 
+        <p className="px-4 pb-1 pt-3 text-xs font-medium text-muted">Recent</p>
+
+        {/* chat history */}
         <nav className="flex-1 overflow-y-auto px-2 pb-2">
           {allThreads.length === 0 ? (
             <p className="px-3 py-4 text-sm text-muted">No chats yet.</p>
           ) : (
             <ul className="space-y-0.5">
               {allThreads.map((thread) => {
-                const active = thread.threadId === currThreadId;
+                const active = !newChat && thread.threadId === currThreadId;
                 return (
                   <li key={thread.threadId}>
                     <div
@@ -125,12 +136,47 @@ function Sidebar({ open, onClose }) {
           )}
         </nav>
 
-        <div className="border-t border-line p-4 text-center text-sm text-muted">
-          By Me <span className="text-danger">&hearts;</span>
+        {/* author section */}
+        <div className="border-t border-line p-3">
+          <p className="px-1 pb-2 text-xs font-medium text-muted">Author</p>
+          <div className="flex items-center gap-3 rounded-lg px-1">
+            <span
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-medium text-accent-fg"
+              aria-hidden="true"
+            >
+              {AUTHOR.name.charAt(0)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">{AUTHOR.name}</p>
+              <p className="text-xs text-muted">Full-stack developer</p>
+            </div>
+            <div className="flex items-center gap-1">
+              <a
+                href={AUTHOR.github}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Vineet Kumar on GitHub"
+                title="GitHub"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-raised hover:text-fg"
+              >
+                <i className="fa-brands fa-github text-lg" />
+              </a>
+              <a
+                href={AUTHOR.linkedin}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Vineet Kumar on LinkedIn"
+                title="LinkedIn"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-raised hover:text-fg"
+              >
+                <i className="fa-brands fa-linkedin text-lg" />
+              </a>
+            </div>
+          </div>
         </div>
       </aside>
     </>
   );
 }
 
-export default Sidebar;
+export default Sidebar;   
