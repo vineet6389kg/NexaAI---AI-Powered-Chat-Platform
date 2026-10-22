@@ -10,5 +10,9 @@
     "mongoose": "^9.10.2",
     "nodemon": "^3.1.14",
     "razorpay": "^2.9.8"
+  },
+  "type": "module",
+  "scripts": {
+    "start": "node Server.js"
   }
 }
