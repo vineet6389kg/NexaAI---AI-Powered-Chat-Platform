@@ -1,14 +1,10 @@
-import { useContext, useEffect } from "react";
+import { useContext, useEffect, useState } from "react";
 import { v1 as uuidv1 } from "uuid";
 import { MyContext } from "./MyContext.jsx";
+import { useAuth } from "./AuthContext.jsx";
 import { apiFetch } from "./api.js";
 import Logo from "./Logo.jsx";
-
-const AUTHOR = {
-  name: "Vineet Kumar",
-  github: "https://github.com/vineet6389kg",
-  linkedin: "https://www.linkedin.com/in/vineet-kumar-046373329",
-};
+import UpgradeModal from "./UpgradeModal.jsx";
 
 function Sidebar({ open, onClose }) {
   const {
@@ -16,6 +12,8 @@ function Sidebar({ open, onClose }) {
     currThreadId, setCurrThreadId,
     newChat, setNewChat, setPrompt, setReply, setPrevChats,
   } = useContext(MyContext);
+  const { user } = useAuth();
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   const getAllThreads = async () => {
     try {
@@ -62,6 +60,14 @@ function Sidebar({ open, onClose }) {
       console.log(err);
     }
   };
+
+  const proUntil = user?.proUntil
+    ? new Date(user.proUntil).toLocaleDateString(undefined, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "";
 
   return (
     <>
@@ -136,47 +142,43 @@ function Sidebar({ open, onClose }) {
           )}
         </nav>
 
-        {/* author section */}
+        {/* upgrade card */}
         <div className="border-t border-line p-3">
-          <p className="px-1 pb-2 text-xs font-medium text-muted">Author</p>
-          <div className="flex items-center gap-3 rounded-lg px-1">
-            <span
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-medium text-accent-fg"
-              aria-hidden="true"
+          {user?.isPro ? (
+            <div className="flex items-center gap-3 rounded-xl border border-line bg-bg p-3">
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-fg">
+                <i className="fa-solid fa-crown text-sm" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">NexaAI Pro</p>
+                <p className="truncate text-xs text-muted">
+                  {proUntil ? `Active until ${proUntil}` : "Unlimited messages"}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowUpgrade(true)}
+              className="flex w-full items-center gap-3 rounded-xl border border-line-strong bg-bg p-3 text-left transition-colors hover:bg-raised"
             >
-              {AUTHOR.name.charAt(0)}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{AUTHOR.name}</p>
-              <p className="text-xs text-muted">Full-stack developer</p>
-            </div>
-            <div className="flex items-center gap-1">
-              <a
-                href={AUTHOR.github}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Vineet Kumar on GitHub"
-                title="GitHub"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-raised hover:text-fg"
-              >
-                <i className="fa-brands fa-github text-lg" />
-              </a>
-              <a
-                href={AUTHOR.linkedin}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Vineet Kumar on LinkedIn"
-                title="LinkedIn"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-raised hover:text-fg"
-              >
-                <i className="fa-brands fa-linkedin text-lg" />
-              </a>
-            </div>
-          </div>
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-fg">
+                <i className="fa-solid fa-crown text-sm" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">Upgrade to Pro</span>
+                <span className="block truncate text-xs text-muted">
+                  Unlimited daily messages
+                </span>
+              </span>
+              <i className="fa-solid fa-chevron-right text-xs text-muted" />
+            </button>
+          )}
         </div>
       </aside>
+
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     </>
   );
 }
 
-export default Sidebar;   
+export default Sidebar;
