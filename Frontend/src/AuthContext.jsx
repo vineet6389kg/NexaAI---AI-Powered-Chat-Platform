@@ -43,13 +43,21 @@ export function AuthProvider({ children }) {
     setUser(data.user);
   };
 
+  // reload the user from the server (e.g. after upgrading to Pro)
+  const refreshUser = async () => {
+    const data = await apiFetch("/auth/me");
+    setUser(data.user);
+  };
+
   const logout = () => {
     clearToken();
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, guestLogin, logout }}>
+    <AuthContext.Provider
+      value={{ user, loading, login, signup, guestLogin, refreshUser, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );
