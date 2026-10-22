@@ -5,7 +5,7 @@ import requireAuth from "../middleware/auth.js";
 
 const router = express.Router();
 
-// every chat route now needs a logged-in user
+// every chat route needs a logged-in user
 router.use(requireAuth);
 
 // Get all threads of the logged-in user
@@ -64,7 +64,16 @@ router.post("/chat", async (req, res) => {
       thread.messages.push({ role: "user", content: message });
     }
 
-    const assistantReply = await getGeminiResponse(message);
+    // MEMORY: take the last 10 messages (this already includes the new question)
+    const history = thread.messages.slice(-10).map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    // Gemini needs the conversation to start with a user message
+    while (history.length > 1 && history[0].role !== "user") history.shift();
+
+    const assistantReply = await getGeminiResponse(history);
 
     if (!assistantReply) {
       return res.status(500).json({ error: "Gemini failed to generate a response" });

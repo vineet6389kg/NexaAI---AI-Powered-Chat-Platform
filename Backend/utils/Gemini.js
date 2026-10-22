@@ -1,23 +1,21 @@
 import "dotenv/config";
 
-const getGeminiResponse = async (message) => {
+// "messages" is now a list like:
+// [{ role: "user", content: "..." }, { role: "assistant", content: "..." }]
+const getGeminiResponse = async (messages) => {
+    // Gemini calls the AI "model" instead of "assistant"
+    const contents = messages.map((m) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }],
+    }));
+
     const options = {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
             "x-goog-api-key": process.env.GEMINI_API_KEY,
         },
-        body: JSON.stringify({
-            contents: [
-                {
-                    parts: [
-                        {
-                            text: message,
-                        },
-                    ],
-                },
-            ],
-        }),
+        body: JSON.stringify({ contents }),
     };
 
     try {
