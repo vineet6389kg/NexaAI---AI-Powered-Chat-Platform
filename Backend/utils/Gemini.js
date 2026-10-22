@@ -1,30 +1,30 @@
 import "dotenv/config";
 
-const MODEL_URL =
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent";
-
+const BASE = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// "messages" = [{ role: "user" | "assistant", content: "..." }, ...]
-const getGeminiResponse = async (messages) => {
-    const contents = messages.map((m) => ({
+const toContents = (messages) =>
+    messages.map((m) => ({
         role: m.role === "assistant" ? "model" : "user",
         parts: [{ text: m.content }],
     }));
 
-    const options = {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": process.env.GEMINI_API_KEY,
-        },
-        body: JSON.stringify({ contents }),
-    };
+const headers = () => ({
+    "Content-Type": "application/json",
+    "x-goog-api-key": process.env.GEMINI_API_KEY,
+});
 
+// Normal (non-streaming) reply, with retry when Google is busy
+const getGeminiResponse = async (messages) => {
+    const body = JSON.stringify({ contents: toContents(messages) });
     const MAX_TRIES = 3;
 
     for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
-        const response = await fetch(MODEL_URL, options);
+        const response = await fetch(`${BASE}:generateContent`, {
+            method: "POST",
+            headers: headers(),
+            body,
+        });
         const data = await response.json();
 
         if (response.ok) {
@@ -35,10 +35,9 @@ const getGeminiResponse = async (messages) => {
 
         console.log(`Gemini error (try ${attempt}/${MAX_TRIES}):`, data?.error?.message);
 
-        // 503 = Google is busy, 429 = too many requests -> wait and try again
         const busy = response.status === 503 || response.status === 429;
         if (busy && attempt < MAX_TRIES) {
-            await sleep(attempt * 1500); // wait 1.5s, then 3s
+            await sleep(attempt * 1500);
             continue;
         }
 
@@ -48,39 +47,31 @@ const getGeminiResponse = async (messages) => {
     }
 };
 
-// Streams the reply piece by piece.
-// Calls onChunk(text) for every piece and returns the full text at the end.
+// Streaming reply: calls onChunk(text) for every piece, returns the full text
 export const streamGeminiResponse = async (messages, onChunk, signal) => {
-    const contents = messages.map((m) => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
-    }));
-
-    const STREAM_URL =
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:streamGenerateContent?alt=sse";
-
+    const body = JSON.stringify({ contents: toContents(messages) });
+    const MAX_TRIES = 3;
     let response;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-        response = await fetch(STREAM_URL, {
+
+    for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
+        response = await fetch(`${BASE}:streamGenerateContent?alt=sse`, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-goog-api-key": process.env.GEMINI_API_KEY,
-            },
-            body: JSON.stringify({ contents }),
+            headers: headers(),
+            body,
             signal,
         });
 
         if (response.ok) break;
 
         const data = await response.json().catch(() => ({}));
-        console.log(`Gemini stream error (try ${attempt}/3):`, data?.error?.message);
+        console.log(`Gemini stream error (try ${attempt}/${MAX_TRIES}):`, data?.error?.message);
 
         const busy = response.status === 503 || response.status === 429;
-        if (busy && attempt < 3) {
+        if (busy && attempt < MAX_TRIES) {
             await sleep(attempt * 1500);
             continue;
         }
+
         const err = new Error(data?.error?.message || "Gemini API request failed");
         err.status = response.status;
         throw err;
@@ -118,3 +109,5 @@ export const streamGeminiResponse = async (messages, onChunk, signal) => {
 
     return full;
 };
+
+export default getGeminiResponse;

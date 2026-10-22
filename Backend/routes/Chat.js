@@ -1,18 +1,48 @@
 import express from "express";
 import Thread from "../models/Thread.js";
-import getGeminiResponse from "../utils/Gemini.js";
+import getGeminiResponse, { streamGeminiResponse } from "../utils/Gemini.js";
 import requireAuth from "../middleware/auth.js";
+
 const router = express.Router();
 
 // every chat route needs a logged-in user
 router.use(requireAuth);
 
+// last 10 messages, starting with a user message (Gemini requires that)
+const buildHistory = (thread) => {
+  const history = thread.messages.slice(-10).map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+  while (history.length > 1 && history[0].role !== "user") history.shift();
+  return history;
+};
+
+// find the user's thread, or start a new one, and add the new question
+const addUserMessage = async (userId, threadId, message) => {
+  let thread = await Thread.findOne({ threadId, user: userId });
+  if (!thread) {
+    thread = new Thread({
+      user: userId,
+      threadId,
+      title: message,
+      messages: [{ role: "user", content: message }],
+    });
+  } else {
+    thread.messages.push({ role: "user", content: message });
+  }
+  return thread;
+};
+
+const friendlyError = (err) =>
+  err.status === 503 || err.status === 429
+    ? "The AI is busy right now. Please try again in a few seconds."
+    : "Something went wrong. Please try again.";
+
 // Get all threads of the logged-in user
 router.get("/thread", async (req, res) => {
   try {
-    const threads = await Thread.find({ user: req.userId }).sort({
-      updatedAt: -1,
-    });
+    const threads = await Thread.find({ user: req.userId }).sort({ updatedAt: -1 });
     res.json(threads);
   } catch (err) {
     console.log(err);
@@ -35,12 +65,8 @@ router.get("/thread/:threadId", async (req, res) => {
 router.delete("/thread/:threadId", async (req, res) => {
   const { threadId } = req.params;
   try {
-    const deletedThread = await Thread.findOneAndDelete({
-      threadId,
-      user: req.userId,
-    });
-    if (!deletedThread)
-      return res.status(404).json({ error: "Thread Not Found" });
+    const deletedThread = await Thread.findOneAndDelete({ threadId, user: req.userId });
+    if (!deletedThread) return res.status(404).json({ error: "Thread Not Found" });
     res.status(200).json({ success: "Thread Deleted Successfully" });
   } catch (err) {
     console.log(err);
@@ -48,64 +74,33 @@ router.delete("/thread/:threadId", async (req, res) => {
   }
 });
 
+// Normal reply (whole answer at once)
 router.post("/chat", async (req, res) => {
   const { threadId, message } = req.body;
-
   if (!threadId || !message) {
     return res.status(400).json({ error: "missing required field" });
   }
 
   try {
-    let thread = await Thread.findOne({ threadId, user: req.userId });
-
-    if (!thread) {
-      thread = new Thread({
-        user: req.userId,
-        threadId,
-        title: message,
-        messages: [{ role: "user", content: message }],
-      });
-    } else {
-      thread.messages.push({ role: "user", content: message });
-    }
-
-    // MEMORY: take the last 10 messages (this already includes the new question)
-    const history = thread.messages.slice(-10).map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
-
-    // Gemini needs the conversation to start with a user message
-    while (history.length > 1 && history[0].role !== "user") history.shift();
-
-    const assistantReply = await getGeminiResponse(history);
-
-    if (!assistantReply) {
-      return res
-        .status(500)
-        .json({ error: "Gemini failed to generate a response" });
-    }
+    const thread = await addUserMessage(req.userId, threadId, message);
+    const assistantReply = await getGeminiResponse(buildHistory(thread));
 
     thread.messages.push({ role: "assistant", content: assistantReply });
     thread.updatedAt = new Date();
-
     await thread.save();
+
     res.json({ reply: assistantReply });
   } catch (err) {
     console.log(err);
-    if (err.status === 503 || err.status === 429) {
-      return res.status(503).json({
-        error: "The AI is busy right now. Please try again in a few seconds.",
-      });
-    }
-    res.status(500).json({ error: "Something went wrong. Please try again." });
+    res.status(err.status === 503 || err.status === 429 ? 503 : 500).json({
+      error: friendlyError(err),
+    });
   }
 });
 
-// Streaming version of /chat (Server-Sent Events)
+// Streaming reply (Server-Sent Events)
 router.post("/chat/stream", async (req, res) => {
   const { threadId, message } = req.body;
-
   if (!threadId || !message) {
     return res.status(400).json({ error: "missing required field" });
   }
@@ -117,24 +112,7 @@ router.post("/chat/stream", async (req, res) => {
   });
 
   try {
-    let thread = await Thread.findOne({ threadId, user: req.userId });
-
-    if (!thread) {
-      thread = new Thread({
-        user: req.userId,
-        threadId,
-        title: message,
-        messages: [{ role: "user", content: message }],
-      });
-    } else {
-      thread.messages.push({ role: "user", content: message });
-    }
-
-    const history = thread.messages.slice(-10).map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
-    while (history.length > 1 && history[0].role !== "user") history.shift();
+    const thread = await addUserMessage(req.userId, threadId, message);
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -143,7 +121,7 @@ router.post("/chat/stream", async (req, res) => {
     let full = "";
     try {
       full = await streamGeminiResponse(
-        history,
+        buildHistory(thread),
         (text) => res.write(`data: ${JSON.stringify({ text })}\n\n`),
         controller.signal,
       );
@@ -162,14 +140,10 @@ router.post("/chat/stream", async (req, res) => {
     res.end();
   } catch (err) {
     console.log(err);
-    const busy = err.status === 503 || err.status === 429;
-    const msg = busy
-      ? "The AI is busy right now. Please try again in a few seconds."
-      : "Something went wrong. Please try again.";
+    const msg = friendlyError(err);
 
     if (!res.headersSent) {
-      res.setHeader("Content-Type", "application/json");
-      res.status(busy ? 503 : 500).json({ error: msg });
+      res.status(err.status === 503 || err.status === 429 ? 503 : 500).json({ error: msg });
     } else {
       res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
       res.end();
