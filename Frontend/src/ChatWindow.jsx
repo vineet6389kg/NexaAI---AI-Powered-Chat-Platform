@@ -1,14 +1,19 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { MyContext } from "./MyContext.jsx";
 import { useAuth } from "./AuthContext.jsx";
-import { streamChat } from "./api.js";
+import { apiFetch, streamChat } from "./api.js";
 import { resizeImage } from "./imageUtils.js";
 import Chat from "./Chat.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 
 function ChatWindow({ onMenu }) {
-  const { prompt, setPrompt, currThreadId, prevChats, setPrevChats, setNewChat } =
-    useContext(MyContext);
+  const {
+    prompt, setPrompt,
+    currThreadId,
+    prevChats, setPrevChats,
+    setNewChat,
+    allThreads, setAllThreads,
+  } = useContext(MyContext);
   const { user, logout } = useAuth();
   const [loading, setLoading] = useState(false);
   const [gotText, setGotText] = useState(false); // has the first piece arrived?
@@ -31,6 +36,18 @@ function ChatWindow({ onMenu }) {
     }
   };
 
+  // reload the sidebar list from the server
+  const refreshThreads = async () => {
+    try {
+      const res = await apiFetch("/thread");
+      setAllThreads(
+        res.map((t) => ({ threadId: t.threadId, title: t.title, updatedAt: t.updatedAt })),
+      );
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
   // send a new message, or (regenerate) answer the last question again
   const send = async ({ regenerate = false } = {}) => {
     if (loading) return;
@@ -45,6 +62,8 @@ function ChatWindow({ onMenu }) {
 
     const snapshot = prevChats; // used to restore if nothing arrives
     const wasNew = prevChats.length === 0;
+    let addedToSidebar = false;
+    let aborted = false;
 
     setLoading(true);
     setGotText(false);
@@ -67,6 +86,19 @@ function ChatWindow({ onMenu }) {
         { role: "user", content: message, ...(img ? { image: img } : {}) },
         { role: "assistant", content: "" },
       ]);
+
+      // show a brand-new chat in the sidebar instantly
+      if (!allThreads.some((t) => t.threadId === currThreadId)) {
+        addedToSidebar = true;
+        setAllThreads((prev) => [
+          {
+            threadId: currThreadId,
+            title: message.slice(0, 80),
+            updatedAt: new Date().toISOString(),
+          },
+          ...prev,
+        ]);
+      }
     }
 
     const controller = new AbortController();
@@ -83,6 +115,9 @@ function ChatWindow({ onMenu }) {
       setPrompt(originalPrompt);
       setImage(img);
       if (wasNew) setNewChat(true);
+      if (addedToSidebar) {
+        setAllThreads((prev) => prev.filter((t) => t.threadId !== currThreadId));
+      }
     };
 
     try {
@@ -104,7 +139,9 @@ function ChatWindow({ onMenu }) {
         },
       });
     } catch (err) {
-      if (err.name !== "AbortError") {
+      if (err.name === "AbortError") {
+        aborted = true;
+      } else {
         console.log(err);
         setError(err.message || "Could not get a reply. Please try again.");
       }
@@ -113,6 +150,10 @@ function ChatWindow({ onMenu }) {
 
     abortRef.current = null;
     setLoading(false);
+
+    // sync the sidebar with the server (after Stop, give the server a moment to save)
+    if (aborted) setTimeout(refreshThreads, 800);
+    else refreshThreads();
   };
 
   // drag & drop an image anywhere on the page.

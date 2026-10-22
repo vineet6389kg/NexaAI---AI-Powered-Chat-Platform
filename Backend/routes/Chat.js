@@ -112,6 +112,8 @@ router.post("/chat/stream", chatLimiter, async (req, res) => {
     if (!res.writableFinished) controller.abort();
   });
 
+  const canWrite = () => !res.writableEnded && !res.destroyed;
+
   try {
     let thread;
 
@@ -150,33 +152,41 @@ router.post("/chat/stream", chatLimiter, async (req, res) => {
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
 
+    // we collect the text ourselves, so a partial answer survives Stop / refresh
     let full = "";
     try {
-      full = await streamGeminiResponse(
+      await streamGeminiResponse(
         buildHistory(thread),
-        (text) => res.write(`data: ${JSON.stringify({ text })}\n\n`),
+        (text) => {
+          full += text;
+          if (canWrite()) res.write(`data: ${JSON.stringify({ text })}\n\n`);
+        },
         controller.signal,
       );
     } catch (err) {
-      if (err.name !== "AbortError") throw err;
+      // Stop button, refresh or closed tab: keep what we already have.
+      // A real error with nothing received is passed on.
+      if (err.name !== "AbortError" && !full) throw err;
     }
 
-    // save the answer (a partial one too, if the user pressed Stop)
+    // save the answer (a partial one too)
     if (full) {
       thread.messages.push({ role: "assistant", content: full });
       thread.updatedAt = new Date();
       await thread.save();
     }
 
-    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-    res.end();
+    if (canWrite()) {
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    }
   } catch (err) {
     console.log(err);
     const msg = friendlyError(err);
 
     if (!res.headersSent) {
       res.status(err.status === 503 || err.status === 429 ? 503 : 500).json({ error: msg });
-    } else {
+    } else if (canWrite()) {
       res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
       res.end();
     }
