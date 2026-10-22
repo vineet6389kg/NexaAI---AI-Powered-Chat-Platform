@@ -6,6 +6,22 @@ import { apiFetch } from "./api.js";
 import Logo from "./Logo.jsx";
 import UpgradeModal from "./UpgradeModal.jsx";
 
+// "Today", "Yesterday", "Previous 7 days"... based on the chat's last update
+const groupLabel = (dateStr) => {
+  if (!dateStr) return "Older";
+  const d = new Date(dateStr);
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = Math.round((startOfToday - day) / 86400000);
+
+  if (diff <= 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  if (diff <= 7) return "Previous 7 days";
+  if (diff <= 30) return "Previous 30 days";
+  return "Older";
+};
+
 function Sidebar({ open, onClose }) {
   const {
     allThreads, setAllThreads,
@@ -18,7 +34,9 @@ function Sidebar({ open, onClose }) {
   const getAllThreads = async () => {
     try {
       const res = await apiFetch("/thread");
-      setAllThreads(res.map((t) => ({ threadId: t.threadId, title: t.title })));
+      setAllThreads(
+        res.map((t) => ({ threadId: t.threadId, title: t.title, updatedAt: t.updatedAt })),
+      );
     } catch (err) {
       console.log(err);
     }
@@ -60,6 +78,15 @@ function Sidebar({ open, onClose }) {
       console.log(err);
     }
   };
+
+  // group the chats (the server already sends them newest first)
+  const groups = [];
+  allThreads.forEach((thread) => {
+    const label = groupLabel(thread.updatedAt);
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) last.items.push(thread);
+    else groups.push({ label, items: [thread] });
+  });
 
   const proUntil = user?.proUntil
     ? new Date(user.proUntil).toLocaleDateString(undefined, {
@@ -103,42 +130,71 @@ function Sidebar({ open, onClose }) {
           </button>
         </div>
 
-        <p className="px-4 pb-1 pt-3 text-xs font-medium text-muted">Recent</p>
-
         {/* chat history */}
-        <nav className="flex-1 overflow-y-auto px-2 pb-2">
+        <nav className="flex-1 overflow-y-auto px-2 pb-3 [scrollbar-width:thin]">
           {allThreads.length === 0 ? (
-            <p className="px-3 py-4 text-sm text-muted">No chats yet.</p>
+            <div className="px-4 py-10 text-center">
+              <i className="fa-regular fa-comments text-2xl text-muted" />
+              <p className="mt-3 text-sm font-medium">No chats yet</p>
+              <p className="mt-1 text-xs text-muted">Your conversations will show up here.</p>
+            </div>
           ) : (
-            <ul className="space-y-0.5">
-              {allThreads.map((thread) => {
-                const active = !newChat && thread.threadId === currThreadId;
-                return (
-                  <li key={thread.threadId}>
-                    <div
-                      className={`group flex items-center rounded-lg transition-colors hover:bg-raised ${
-                        active ? "bg-raised" : ""
-                      }`}
-                    >
-                      <button
-                        onClick={() => changeThread(thread.threadId)}
-                        aria-current={active ? "true" : undefined}
-                        className="min-w-0 flex-1 truncate rounded-lg px-3 py-2 text-left text-sm"
-                      >
-                        {thread.title}
-                      </button>
-                      <button
-                        onClick={() => deleteThread(thread.threadId)}
-                        aria-label={`Delete chat: ${thread.title}`}
-                        className="mr-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted transition hover:text-danger focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
-                      >
-                        <i className="fa-regular fa-trash-can text-sm" />
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            groups.map((group) => (
+              <section key={group.label} className="mb-3">
+                <h3 className="px-3 pb-1.5 pt-3 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  {group.label}
+                </h3>
+                <ul className="space-y-0.5">
+                  {group.items.map((thread) => {
+                    const active = !newChat && thread.threadId === currThreadId;
+                    return (
+                      <li key={thread.threadId}>
+                        <div
+                          className={`group relative flex items-center rounded-lg transition-colors ${
+                            active ? "bg-raised" : "hover:bg-raised/60"
+                          }`}
+                        >
+                          {/* accent bar on the active chat */}
+                          {active && (
+                            <span
+                              className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-accent"
+                              aria-hidden="true"
+                            />
+                          )}
+
+                          <button
+                            onClick={() => changeThread(thread.threadId)}
+                            aria-current={active ? "true" : undefined}
+                            title={thread.title}
+                            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg py-2 pl-3 pr-1 text-left"
+                          >
+                            <i
+                              className={`fa-regular fa-message w-4 shrink-0 text-center text-xs ${
+                                active ? "text-accent dark:text-ring" : "text-muted"
+                              }`}
+                            />
+                            <span
+                              className={`truncate text-sm ${active ? "font-medium" : ""}`}
+                            >
+                              {thread.title}
+                            </span>
+                          </button>
+
+                          <button
+                            onClick={() => deleteThread(thread.threadId)}
+                            aria-label={`Delete chat: ${thread.title}`}
+                            title="Delete chat"
+                            className="mr-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-surface hover:text-danger focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                          >
+                            <i className="fa-regular fa-trash-can text-xs" />
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))
           )}
         </nav>
 
