@@ -25,8 +25,9 @@ export async function apiFetch(path, options = {}) {
   return data;
 }
 
-// Reads the streaming reply and calls onText(text) for each piece
-export async function streamChat({ message, threadId, signal, onText }) {
+// Streams the reply and calls onText(text) for each piece.
+// regenerate: true = answer the last question again.
+export async function streamChat({ message, threadId, image, regenerate, signal, onText }) {
   const token = getToken();
   const res = await fetch(`${API_URL}/chat/stream`, {
     method: "POST",
@@ -34,7 +35,7 @@ export async function streamChat({ message, threadId, signal, onText }) {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ message, threadId }),
+    body: JSON.stringify({ message, threadId, image, regenerate }),
     signal,
   });
 

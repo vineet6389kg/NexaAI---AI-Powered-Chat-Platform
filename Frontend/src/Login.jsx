@@ -3,11 +3,12 @@ import { useAuth } from "./AuthContext.jsx";
 import { AuthShell, ErrorBanner, Field, SubmitButton, isEmail } from "./AuthUI.jsx";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, guestLogin } = useAuth();
   const [form, setForm] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
 
   const update = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
@@ -32,6 +33,17 @@ export default function Login() {
     } catch (err) {
       setServerError(err.message);
       setLoading(false);
+    }
+  };
+
+  const onGuest = async () => {
+    setServerError("");
+    setGuestLoading(true);
+    try {
+      await guestLogin();
+    } catch (err) {
+      setServerError(err.message);
+      setGuestLoading(false);
     }
   };
 
@@ -67,6 +79,22 @@ export default function Login() {
         />
         <SubmitButton loading={loading}>Log in</SubmitButton>
       </form>
+
+      <div className="my-4 flex items-center gap-3 text-xs text-muted">
+        <span className="h-px flex-1 bg-line" />
+        or
+        <span className="h-px flex-1 bg-line" />
+      </div>
+
+      <button
+        type="button"
+        onClick={onGuest}
+        disabled={guestLoading || loading}
+        className="flex w-full items-center justify-center gap-2 rounded-lg border border-line-strong px-4 py-2.5 text-sm font-medium transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-70"
+      >
+        {guestLoading && <i className="fa-solid fa-circle-notch fa-spin" />}
+        Try the demo (no signup)
+      </button>
     </AuthShell>
   );
 }

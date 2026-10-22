@@ -36,13 +36,20 @@ export function AuthProvider({ children }) {
     setUser(data.user);
   };
 
+  // demo account, no signup needed
+  const guestLogin = async () => {
+    const data = await apiFetch("/auth/guest", { method: "POST" });
+    setToken(data.token);
+    setUser(data.user);
+  };
+
   const logout = () => {
     clearToken();
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, guestLogin, logout }}>
       {children}
     </AuthContext.Provider>
   );
