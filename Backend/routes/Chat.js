@@ -11,7 +11,9 @@ router.use(requireAuth);
 // Get all threads of the logged-in user
 router.get("/thread", async (req, res) => {
   try {
-    const threads = await Thread.find({ user: req.userId }).sort({ updatedAt: -1 });
+    const threads = await Thread.find({ user: req.userId }).sort({
+      updatedAt: -1,
+    });
     res.json(threads);
   } catch (err) {
     console.log(err);
@@ -34,8 +36,12 @@ router.get("/thread/:threadId", async (req, res) => {
 router.delete("/thread/:threadId", async (req, res) => {
   const { threadId } = req.params;
   try {
-    const deletedThread = await Thread.findOneAndDelete({ threadId, user: req.userId });
-    if (!deletedThread) return res.status(404).json({ error: "Thread Not Found" });
+    const deletedThread = await Thread.findOneAndDelete({
+      threadId,
+      user: req.userId,
+    });
+    if (!deletedThread)
+      return res.status(404).json({ error: "Thread Not Found" });
     res.status(200).json({ success: "Thread Deleted Successfully" });
   } catch (err) {
     console.log(err);
@@ -76,7 +82,9 @@ router.post("/chat", async (req, res) => {
     const assistantReply = await getGeminiResponse(history);
 
     if (!assistantReply) {
-      return res.status(500).json({ error: "Gemini failed to generate a response" });
+      return res
+        .status(500)
+        .json({ error: "Gemini failed to generate a response" });
     }
 
     thread.messages.push({ role: "assistant", content: assistantReply });
@@ -86,6 +94,11 @@ router.post("/chat", async (req, res) => {
     res.json({ reply: assistantReply });
   } catch (err) {
     console.log(err);
+    if (err.status === 503 || err.status === 429) {
+      return res.status(503).json({
+        error: "The AI is busy right now. Please try again in a few seconds.",
+      });
+    }
     res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });

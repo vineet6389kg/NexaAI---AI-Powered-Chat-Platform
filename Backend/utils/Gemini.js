@@ -1,9 +1,12 @@
 import "dotenv/config";
 
-// "messages" is now a list like:
-// [{ role: "user", content: "..." }, { role: "assistant", content: "..." }]
+const MODEL_URL =
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent";
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// "messages" = [{ role: "user" | "assistant", content: "..." }, ...]
 const getGeminiResponse = async (messages) => {
-    // Gemini calls the AI "model" instead of "assistant"
     const contents = messages.map((m) => ({
         role: m.role === "assistant" ? "model" : "user",
         parts: [{ text: m.content }],
@@ -18,33 +21,29 @@ const getGeminiResponse = async (messages) => {
         body: JSON.stringify({ contents }),
     };
 
-    try {
-        const response = await fetch(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
-            options
-        );
+    const MAX_TRIES = 3;
 
+    for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
+        const response = await fetch(MODEL_URL, options);
         const data = await response.json();
 
-        if (!response.ok) {
-            console.log("Gemini API Error:", data);
-
-            throw new Error(
-                data?.error?.message || "Gemini API request failed"
-            );
+        if (response.ok) {
+            const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!reply) throw new Error("Gemini returned an empty response");
+            return reply;
         }
 
-        const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        console.log(`Gemini error (try ${attempt}/${MAX_TRIES}):`, data?.error?.message);
 
-        if (!reply) {
-            console.log("Unexpected Gemini response:", data);
-            throw new Error("Gemini returned an empty response");
+        // 503 = Google is busy, 429 = too many requests -> wait and try again
+        const busy = response.status === 503 || response.status === 429;
+        if (busy && attempt < MAX_TRIES) {
+            await sleep(attempt * 1500); // wait 1.5s, then 3s
+            continue;
         }
 
-        return reply;
-
-    } catch (err) {
-        console.log("Gemini Error:", err.message);
+        const err = new Error(data?.error?.message || "Gemini API request failed");
+        err.status = response.status;
         throw err;
     }
 };
