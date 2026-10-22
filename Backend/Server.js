@@ -4,6 +4,7 @@ import cors from 'cors';
 import mongoose from 'mongoose'; 
 import dns from 'node:dns'; 
 import chatRouter from './routes/Chat.js';
+import authRouter from './routes/Auth.js';
 
 const app = express(); 
 const PORT = 8080; 
@@ -16,6 +17,7 @@ dns.setServers([
     '1.1.1.1' 
 ]); 
 
+app.use("/api/auth", authRouter);
 app.use("/api", chatRouter);
  
 app.listen(PORT, () => { 

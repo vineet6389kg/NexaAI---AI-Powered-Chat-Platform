@@ -1,30 +1,17 @@
 import express from "express";
 import Thread from "../models/Thread.js";
 import getGeminiResponse from "../utils/Gemini.js";
+import requireAuth from "../middleware/auth.js";
 
 const router = express.Router();
 
-//test
+// every chat route now needs a logged-in user
+router.use(requireAuth);
 
-router.post("/test", async (req, res) => {
-  try {
-    const thread = new Thread({
-      threadId: "xyz",
-      title: "Testing new Thread",
-    });
-    const response = await thread.save();
-    res.send(response);
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ error: "Failded to save in DB" });
-  }
-});
-
-// Get all thread
-
+// Get all threads of the logged-in user
 router.get("/thread", async (req, res) => {
   try {
-    const threads = await Thread.find({}).sort({ updatedAt: -1 }); // here sort function show thread in Ascending order;
+    const threads = await Thread.find({ user: req.userId }).sort({ updatedAt: -1 });
     res.json(threads);
   } catch (err) {
     console.log(err);
@@ -35,10 +22,8 @@ router.get("/thread", async (req, res) => {
 router.get("/thread/:threadId", async (req, res) => {
   const { threadId } = req.params;
   try {
-    const thread = await Thread.findOne({ threadId });
-    if (!thread) {
-      res.status(404).json({ error: "Thread not found" });
-    }
+    const thread = await Thread.findOne({ threadId, user: req.userId });
+    if (!thread) return res.status(404).json({ error: "Thread not found" });
     res.json(thread.messages);
   } catch (err) {
     console.log(err);
@@ -47,15 +32,14 @@ router.get("/thread/:threadId", async (req, res) => {
 });
 
 router.delete("/thread/:threadId", async (req, res) => {
-  const { threadId } = req.params; // fetching thread Id
+  const { threadId } = req.params;
   try {
-    const deletedThread = await Thread.findOneAndDelete({ threadId });
-    if (!deletedThread) {
-      res.status(404).json({ error: "Thread Not Found" });
-    }
+    const deletedThread = await Thread.findOneAndDelete({ threadId, user: req.userId });
+    if (!deletedThread) return res.status(404).json({ error: "Thread Not Found" });
     res.status(200).json({ success: "Thread Deleted Successfully" });
   } catch (err) {
     console.log(err);
+    res.status(500).json({ error: "Failed to delete Thread" });
   }
 });
 
@@ -63,15 +47,15 @@ router.post("/chat", async (req, res) => {
   const { threadId, message } = req.body;
 
   if (!threadId || !message) {
-    return res.status(404).json({ error: "missing required field" });
+    return res.status(400).json({ error: "missing required field" });
   }
 
   try {
-    let thread = await Thread.findOne({ threadId });
+    let thread = await Thread.findOne({ threadId, user: req.userId });
 
     if (!thread) {
-      // create a new thread in DB
       thread = new Thread({
+        user: req.userId,
         threadId,
         title: message,
         messages: [{ role: "user", content: message }],
@@ -83,9 +67,7 @@ router.post("/chat", async (req, res) => {
     const assistantReply = await getGeminiResponse(message);
 
     if (!assistantReply) {
-      return res.status(500).json({
-        error: "Gemini failed to generate a response",
-      });
+      return res.status(500).json({ error: "Gemini failed to generate a response" });
     }
 
     thread.messages.push({ role: "assistant", content: assistantReply });
@@ -95,7 +77,7 @@ router.post("/chat", async (req, res) => {
     res.json({ reply: assistantReply });
   } catch (err) {
     console.log(err);
-    res.status(500).json({ error: "Something is wrong" });
+    res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
 
