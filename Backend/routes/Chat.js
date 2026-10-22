@@ -2,8 +2,6 @@ import express from "express";
 import Thread from "../models/Thread.js";
 import getGeminiResponse from "../utils/Gemini.js";
 import requireAuth from "../middleware/auth.js";
-import getGeminiResponse, { streamGeminiResponse } from "../utils/Gemini.js";
-
 const router = express.Router();
 
 // every chat route needs a logged-in user
